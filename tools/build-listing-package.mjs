@@ -29,12 +29,14 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const SUBMISSION_META = {
   regions: ['CN'],
   enabledEnds: ['桌面端', '云端'],
-  operation: 'update',
-  existingName: 'evidence-guard',
-  previousVersion: '1.0.0',
+  // The rejected submission never reached the Marketplace, so CN has no
+  // `evidence-guard` entry yet — a resubmission must be filed as a NEW plugin.
+  operation: 'new',
+  existingName: '',
+  previousVersion: '',
   submitEmail: '545965171@qq.com',
-  submitAccount: '',
-  organization: '',
+  submitAccount: '米殊',
+  organization: '明殊',
 };
 
 const [packageDirArg, outZipArg, ...rest] = process.argv.slice(2);
@@ -121,17 +123,32 @@ const warnings = blocking.filter((issue) => issue.severity === 'warning');
 const infos = blocking.filter((issue) => issue.severity === 'info');
 const notes = issues.filter((issue) => NON_BLOCKING.has(issue.id));
 
-// --- 2. build the archive ---------------------------------------------------
 const entries = files.map((rel) => ({
   path: rel,
   data: fs.readFileSync(path.join(packageDir, rel)),
 }));
-const zip = createZip(entries);
-fs.mkdirSync(path.dirname(outZip), { recursive: true });
-fs.writeFileSync(outZip, zip);
 
-const zipDigest = crypto.createHash('sha256').update(zip).digest('hex');
+// --- 2. build the archive ---------------------------------------------------
+// `--no-zip` keeps the archive that was actually submitted byte-for-byte and
+// only regenerates the report, so the hash in the report always describes the
+// file that was uploaded.
+const skipZip = rest.includes('--no-zip');
+let zip;
+let zipDigest;
 const totalBytes = entries.reduce((sum, entry) => sum + entry.data.length, 0);
+if (skipZip) {
+  if (!fs.existsSync(outZip)) {
+    console.error(`--no-zip 需要已存在的 ZIP：${outZip}`);
+    process.exit(2);
+  }
+  zip = fs.readFileSync(outZip);
+  zipDigest = crypto.createHash('sha256').update(zip).digest('hex');
+} else {
+  zip = createZip(entries);
+  fs.mkdirSync(path.dirname(outZip), { recursive: true });
+  fs.writeFileSync(outZip, zip);
+  zipDigest = crypto.createHash('sha256').update(zip).digest('hex');
+}
 
 // --- 3. write the report ----------------------------------------------------
 const lines = [];
@@ -143,7 +160,11 @@ lines.push(`- 提交 ZIP：\`${outZip}\``);
 lines.push(`- ZIP 大小：${zip.length} 字节；解包后 ${totalBytes} 字节；${entries.length} 个文件`);
 lines.push(`- ZIP sha256：\`${zipDigest}\``);
 lines.push(`- 目标区域：${SUBMISSION_META.regions.join('、')}；启用端：${SUBMISSION_META.enabledEnds.join('、')}`);
-lines.push(`- 操作类型：${SUBMISSION_META.operation === 'update' ? '更新已有 Plugin' : '上架新 Plugin'}（原名 ${SUBMISSION_META.existingName}，上次版本 ${SUBMISSION_META.previousVersion}）`);
+const operationLabel =
+  SUBMISSION_META.operation === 'update'
+    ? `更新已有 Plugin（原名 ${SUBMISSION_META.existingName}，上次版本 ${SUBMISSION_META.previousVersion}）`
+    : '上架新 Plugin（CN 区此前无此插件，被驳回的投稿不会在 Marketplace 留记录）';
+lines.push(`- 操作类型：${operationLabel}`);
 lines.push('');
 lines.push(`## 结论`);
 lines.push('');
