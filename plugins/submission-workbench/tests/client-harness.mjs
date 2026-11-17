@@ -8,13 +8,14 @@
  *  - a request that never reaches the Node service;
  *  - a screen that never renders after the response arrives.
  *
- * Run: node miniapp/node/client-harness.mjs
+ * Run: node tests/client-harness.mjs
  */
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const root = join(process.cwd(), 'miniapp');
+// Resolve the package root from this file so the harness works from any cwd.
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', 'miniapp');
 const html = await readFile(join(root, 'client/index.html'), 'utf8');
 const clientPath = join(root, 'client/app.js');
 

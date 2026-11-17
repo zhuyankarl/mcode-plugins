@@ -6,7 +6,7 @@
  * It covers the path the DOM harness cannot: real HTTP headers, the asset
  * upload route, package generation and the download route.
  *
- * Run: node miniapp/node/server-harness.mjs
+ * Run: node tests/server-harness.mjs
  */
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 
-import { start } from './server.mjs';
+import { start } from '../miniapp/node/server.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -51,7 +51,7 @@ function freePort() {
 
 const dataDir = await mkdtemp(join(tmpdir(), 'miniapp-listing-'));
 // Resolve the package root from this file so the harness works from any cwd.
-const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const port = await freePort();
 const controller = new AbortController();
 

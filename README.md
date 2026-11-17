@@ -101,11 +101,13 @@ mcode-plugins/
         ├── .minimax-plugin/plugin.json
         ├── package.json         # mcode.miniApp 声明入口
         ├── icon.png
-        ├── README.md
+        ├── README.md            # 英文说明（社区仓库主文档）
+        ├── README.zh-CN.md      # 中文说明
+        ├── tests/               # 自测与集成测试（不在运行载荷内）
         └── miniapp/
             ├── miniapp.json
             ├── client/          # 页面载荷
-            └── node/            # Node 载荷（含 selftest.mjs）
+            └── node/            # Node 载荷
 ```
 
 ---
@@ -120,7 +122,7 @@ node plugins/groundtruth/scripts/hook-session.mjs
 node plugins/groundtruth/scripts/probe-table.mjs sheets "<表路径>.xlsx"
 
 # Mini App 自测
-node plugins/submission-workbench/miniapp/node/selftest.mjs
+node plugins/submission-workbench/tests/selftest.mjs
 ```
 
 ---
@@ -130,6 +132,7 @@ node plugins/submission-workbench/miniapp/node/selftest.mjs
 | 插件 | 版本 | 说明 |
 | --- | --- | --- |
 | groundtruth | 1.1.0 | Windows Hook 改为自解析 node 的启动器，移除硬编码绝对路径，可跨机分发；stdin JSON 增加 BOM 容错，避免带 BOM 的管道让校验链静默失效 |
+| submission-workbench | 1.1.0 | 测试脚本移出运行载荷（`tests/`），去掉未授权的宿主工具探测，README 拆成英文主文档 + 中文版 |
 | submission-workbench | 1.0.0 | 首次发布；插件 id 由 `miniapp-<uuid>` 正式命名为 `submission-workbench` |
 
 包内内容有任何变化都会提升 `version`。

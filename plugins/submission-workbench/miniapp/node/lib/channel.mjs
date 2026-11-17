@@ -3,12 +3,14 @@
  * Probe for an official marketplace submission interface and the permissions
  * that would be required to use it.
  *
- * Findings are grounded in two kinds of evidence:
- *  1. The official submission guide (read 2026-11-16) documents exactly two
- *     intake channels: a Feishu form (manual, browser, logged-in account) and a
- *     public GitHub repository. It documents no programmatic submission API.
- *  2. Runtime probes: reachability of the documented endpoints, and the tool
- *     inventory this Host actually exposes.
+ * Findings are grounded in the official submission guide (read 2026-11-16),
+ * which documents exactly two intake channels: a Feishu form (manual, browser,
+ * logged-in account) and a public GitHub repository. It documents no
+ * programmatic submission API.
+ *
+ * The app deliberately calls no Host tool API: `miniapp.json` declares no
+ * `toolAccess`, so `context.tool` is absent, and the scan never sees a call
+ * that would need a grant the manifest does not make.
  *
  * When no usable submission interface exists, the app must state that plainly
  * and produce reviewable materials only — never claim a submission happened.
@@ -67,39 +69,8 @@ async function probeHttp(url) {
 }
 
 /**
- * Inspect the Host tool inventory for anything that could submit a plugin to
- * the marketplace. Names are matched conservatively; no tool is called here.
- * @param {{ tool?: { list: () => Promise<{ tools: unknown[], partial: boolean }> } }} context
- * @returns {Promise<{ matched: string[], listed: number, partial: boolean, error: string | null }>}
- */
-async function probeTools(context) {
-  if (!context.tool || typeof context.tool.list !== 'function') {
-    return { matched: [], listed: 0, partial: false, error: '本 Host 未暴露 tool 接口' };
-  }
-  try {
-    const result = await context.tool.list();
-    const tools = Array.isArray(result.tools) ? result.tools : [];
-    const matched = [];
-    for (const tool of tools) {
-      if (!tool || typeof tool !== 'object') continue;
-      const name = typeof tool.name === 'string' ? tool.name : '';
-      const description = typeof tool.description === 'string' ? tool.description : '';
-      const haystack = `${name} ${description}`.toLowerCase();
-      const talksMarketplace =
-        /(marketplace|plugin|上架|投稿|submit)/.test(haystack) &&
-        /(submit|publish|upload|上架|投稿|发布)/.test(haystack);
-      if (talksMarketplace) matched.push(name);
-    }
-    return { matched, listed: tools.length, partial: Boolean(result.partial) };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { matched: [], listed: 0, partial: false, error: message };
-  }
-}
-
-/**
  * Build the submission-channel report.
- * @param {{ tool?: unknown }} context
+ * @param {unknown} _context Unused: the app calls no Host tool API.
  * @param {{ submitAccount: string, submitEmail: string, organization: string }} draft
  * @returns {Promise<ChannelReport>}
  */
@@ -143,19 +114,12 @@ export async function probeSubmissionChannel(context, draft) {
     evidence: `GET ${STATUS_FORM_URL}`,
   });
 
-  const toolProbe = await probeTools(/** @type {any} */ (context));
-  const submissionTools = toolProbe.matched;
   findings.push({
     id: 'tool',
     label: '本机可用的投稿工具',
-    status: submissionTools.length > 0 ? 'available' : 'unavailable',
-    detail:
-      submissionTools.length > 0
-        ? `发现可能的投稿工具：${submissionTools.join('、')}。本工具不会自动调用它们。`
-        : toolProbe.error
-          ? `无法枚举本机工具：${toolProbe.error}`
-          : `已枚举 ${toolProbe.listed} 个工具，未发现官方市场的投稿接口。`,
-    evidence: 'context.tool.list()',
+    status: 'unavailable',
+    detail: '本应用不调用宿主工具接口，也不申请 toolAccess 授权，因此没有程序化投稿通道。',
+    evidence: 'miniapp.json 未声明 toolAccess',
   });
 
   const requiredPermissions = [
@@ -179,14 +143,12 @@ export async function probeSubmissionChannel(context, draft) {
     },
   ];
 
-  const programmatic = submissionTools.length > 0;
-  const conclusion = programmatic
-    ? '本机存在可能的投稿工具，但本应用不代替你提交：仍只生成可审核材料，由你确认后手动执行提交。'
-    : '未发现官方市场的程序化提交接口。官方受理入口为飞书表单（人工提交）与公开 GitHub 仓库，本应用因此只生成可审核的上架材料，不代表已提交或已上架。';
+  const conclusion =
+    '未发现官方市场的程序化提交接口。官方受理入口为飞书表单（人工提交）与公开 GitHub 仓库，本应用因此只生成可审核的上架材料，不代表已提交或已上架。';
 
   return {
     checkedAt: new Date().toISOString(),
-    submissionInterface: programmatic ? 'tool' : 'manual_form',
+    submissionInterface: 'manual_form',
     canSubmitProgrammatically: false,
     findings,
     requiredPermissions,

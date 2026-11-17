@@ -1,61 +1,109 @@
-# 插件上架材料工作台（submission-workbench）
+# Plugin Listing Workbench (submission-workbench)
 
-一个 Mini App：填写插件清单与上架信息，逐项核对名称、版本、必填字段与内容一致性，
-一键生成可审核的**上架材料包**，并标出还缺哪些必填项。
+A Mini App for preparing a MiniMax Plugin submission: fill in the plugin manifest and the
+listing fields, check the name, version, required fields and cross-file consistency item by
+item, and download a reviewable listing package that names every missing item.
 
-## 它做什么
+中文名：插件上架材料工作台
 
-页面上分四块：
+![Preview](docs/preview.png)
 
-1. **上架信息** —— 粘贴 `.minimax-plugin/plugin.json` 全文，填期望市场名称、目标分类、
-   简介、说明文档（会写进包的 README.md）、最多 3 条示例 query。
-2. **目标市场要求** —— 上架新 Plugin 还是更新已有 Plugin（更新时原 Plugin 名必须不变、
-   并填上次提交版本）、提交邮箱、提交飞书账号、目标区域（CN/US）、启用端（桌面端/云端）。
-   区域与启用端是**两个独立维度**，由 Marketplace catalog 管理，不写进 `plugin.json`。
-3. **素材** —— 按角色上传：图标（对应 manifest 里的 `icon` 路径）、截图、Skill/MCP/App 文件。
-4. **结果区** —— 「检查结果」列出缺失项与内容冲突，「上架预览」给出市场卡片预览，
-   「提交通道与权限」显示探测到的提交通道，「上架材料包」可下载打包好的 ZIP。
+[简体中文](README.zh-CN.md)
 
-## 怎么用
+## What it does
 
-装好后在 MiniMax Code 里打开这个 Mini App，页面地址是 `/dashboard`。
-也可以直接对 Agent 说「检查我的插件清单能不能上架」「生成插件上架材料包」。
+The page has four blocks:
 
-## 运行环境
+1. **Listing information** — paste the full `.minimax-plugin/plugin.json`, then set the expected
+   market name, the target category, the summary, the documentation (written into the package
+   `README.md`) and up to 3 example queries.
+2. **Target market requirements** — a new submission or an update of an existing plugin (on an
+   update the original plugin name must stay the same and the last submitted version is
+   required), the submission email, the submitting Feishu account, the target region (CN/US) and
+   the enabled clients (desktop/cloud). Region and enabled clients are **two independent
+   dimensions** managed by the Marketplace catalog; they are not written into `plugin.json`.
+3. **Assets** — upload by role: icon (the path the manifest declares), screenshots, and
+   Skill/MCP/App files.
+4. **Results** — *Check results* lists the missing items and the content conflicts, *Listing
+   preview* shows the market card, *Submission channel and permissions* shows the intake
+   channels this machine can reach, and *Listing package* lets you download the packaged ZIP.
 
-- 需要 **Node.js**（任意 LTS 版本），因为 Node 载荷是纯 Node 进程。
-- **零第三方依赖**：只用 Node 内置模块（`node:http`、`node:fs`、`node:zlib`、`node:crypto` 等），
-  宿主不装依赖、不跑构建，所以包体可以直接运行。
-- 页面是原生 HTML/CSS/JS，无构建步骤。
+## Install
 
-## 权限与数据
+**From a Git repository** (MiniMax Code 3.1.11 or later): in the plugin market choose
+**Create → Mini App → Import from Git repository** and paste
 
-- `miniapp.json` 只声明了页面与 Node 两份载荷，未申请 `hostConnectorAccess`、
-  `agentAccess`、`deviceAccess` 等额外权限。
-- 草稿与素材存在宿主为该插件提供的可写数据目录里，不写插件包本身。
-
-## 安装
-
-见仓库根目录的 [README](../../README.md)。最省事的一条：
-
-```powershell
-git clone https://github.com/zhuyankarl/mcode-plugins.git
-cd mcode-plugins
-powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+https://github.com/zhuyankarl/mcode-plugins/tree/main/plugins/submission-workbench
 ```
 
-装完重启 MiniMax Code，在插件市场确认「插件上架材料工作台」已启用。
-也可以走图形界面：插件市场 →「创建」→ Mini App →「从 Git 仓库导入」，
-填 https://github.com/zhuyankarl/mcode-plugins/tree/main/plugins/submission-workbench 。
+**Manually**: copy the whole `plugins/submission-workbench` directory, including the hidden
+`.minimax-plugin` directory, into `<dataDir>/plugins/submission-workbench/`, then restart
+MiniMax Code.
 
-## 自测
+**The whole repository**: clone <https://github.com/zhuyankarl/mcode-plugins> and run
+`install.ps1` (Windows) or `install.sh` (macOS/Linux). It installs this plugin together with the
+`groundtruth` plugin and then self-checks the installation.
 
-包内附带自测脚本，在插件目录下执行：
+## Use
+
+Open the app in MiniMax Code; the page is served at `/dashboard`. You can also ask the Agent
+directly: "check whether my plugin manifest can be submitted" or "generate the listing package".
+
+## Bundled Skill
+
+The package ships one Skill, `listing-check`
+(`skills/listing-check/SKILL.md`): it gives the Agent the same checklist the page applies —
+required manifest fields, the fixed categories, the "at least one capability" rule, the version
+bump rule, the package limits and the two official intake channels — so the Agent can answer
+"can my plugin be submitted" without opening the page.
+
+## Tested environment
+
+- MiniMax Code 3.1.16 on Windows 11.
+- Node.js 24.15.0 — any LTS release works, because the Node payload is a plain Node process.
+
+## Required configuration
+
+- Node.js must be on `PATH`. The payload uses Node built-in modules only (`node:http`,
+  `node:fs`, `node:zlib`, `node:crypto`, …): the host installs no dependencies and runs no build
+  step, so the package runs as it is.
+- The page is plain HTML, CSS and JavaScript with no build step.
+
+## Data & access
+
+- **Files it reads**: only the files inside its own package.
+- **Files it writes**: the working draft, the uploaded assets and the generated listing packages,
+  under the writable data directory the Host provides for this plugin
+  (`<dataDir>/v2/plugin-data/liveboards/submission-workbench/`). It never writes into the plugin
+  package itself.
+- **Network requests**: when you run a check, the Node service makes three HTTPS `GET` requests
+  to see whether the documented intake channels are reachable — the submission guide on
+  `code.minimax.cn` and two Feishu form URLs on `vrfi1sk8a0.feishu.cn`. There is no other
+  outbound traffic. The Node service itself listens on the loopback port the Host assigns it.
+- **Agent turns it runs**: none. `miniapp/miniapp.json` declares no `agentAccess`.
+- **Conversations it reads**: none.
+- **Tools it calls**: none. `miniapp/miniapp.json` declares no `toolAccess`.
+- **Microphone, camera, notifications**: none.
+- **Which MiniMax Code page you are on**: not read. `miniapp/miniapp.json` declares no
+  `hostAccess`.
+
+## What it does not do
+
+The app never submits anything on your behalf. The official intake channels are a Feishu form (a
+human submits it in a logged-in browser) and a public GitHub repository, so the app only produces
+materials you can review — and it says exactly that in its own report.
+
+## Tests
+
+Run these inside the package directory:
 
 ```bash
-node miniapp/node/selftest.mjs
+node tests/selftest.mjs        # backend rules
+node tests/client-harness.mjs   # the page against a DOM stub
+node tests/server-harness.mjs   # the real Node service over HTTP
 ```
 
-## 许可证
+## License
 
-MIT，见仓库根目录 [LICENSE](../../LICENSE)。
+MIT — see [LICENSE](LICENSE).

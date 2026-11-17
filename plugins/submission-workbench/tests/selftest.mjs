@@ -1,13 +1,13 @@
 // @ts-check
 /**
  * Local test harness for the Mini App backend logic.
- * Run: node miniapp/node/selftest.mjs
+ * Run: node tests/selftest.mjs
  */
-import { validateManifest } from './lib/manifest-rules.mjs';
-import { validateDraft } from './lib/listing-rules.mjs';
-import { buildPackage } from './lib/package-builder.mjs';
-import { createZip } from './lib/zip.mjs';
-import { parseJsonWithDuplicates } from './lib/json-parse.mjs';
+import { validateManifest } from '../miniapp/node/lib/manifest-rules.mjs';
+import { validateDraft } from '../miniapp/node/lib/listing-rules.mjs';
+import { buildPackage } from '../miniapp/node/lib/package-builder.mjs';
+import { createZip } from '../miniapp/node/lib/zip.mjs';
+import { parseJsonWithDuplicates } from '../miniapp/node/lib/json-parse.mjs';
 import { inflateRawSync } from 'node:zlib';
 
 let passed = 0;
