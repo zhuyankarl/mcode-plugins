@@ -1,0 +1,13 @@
+# 统一按 LF 存储，签出时按需转换。
+* text=auto eol=lf
+
+# Windows 批处理与 PowerShell 脚本用 CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary

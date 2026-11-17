@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "name": "groundtruth",
+  "displayName": "Groundtruth 证据守门",
+  "version": "1.1.0",
+  "description": "为高幻觉倾向模型加装证据契约：会话启动注入弃权与出处规程，收尾时对伪造路径、无证据完成声明做确定性校验，数值结论强制回源到实际表格并给出来源坐标。",
+  "author": "明殊",
+  "icon": "icon.png",
+  "darkIcon": "icon-dark.png",
+  "category": "Code",
+  "exampleQueries": [
+    "按证据契约做这份分析，逐条标出已验证和未验证。",
+    "这个数值是从哪张表哪个格子来的？帮我回源核一遍。",
+    "审一下这份结论，哪些是编的、哪些没有出处？"
+  ],
+  "apps": [],
+  "mcpServers": [],
+  "skills": [
+    "skills/evidence-contract/SKILL.md",
+    "skills/number-grounding/SKILL.md"
+  ],
+  "hooks": [
+    "hooks/hooks.json"
+  ]
+}

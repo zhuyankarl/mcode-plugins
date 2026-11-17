@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/hook-session.mjs\"",
+            "commandWindows": "cmd /d /c \"\"${PLUGIN_ROOT}\\scripts\\run-hook.cmd\" hook-session.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/hook-prompt.mjs\"",
+            "commandWindows": "cmd /d /c \"\"${PLUGIN_ROOT}\\scripts\\run-hook.cmd\" hook-prompt.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "read|grep|glob|bash|edit|write|task|web_fetch|web_search",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/hook-post-tool.mjs\"",
+            "commandWindows": "cmd /d /c \"\"${PLUGIN_ROOT}\\scripts\\run-hook.cmd\" hook-post-tool.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/hook-stop.mjs\"",
+            "commandWindows": "cmd /d /c \"\"${PLUGIN_ROOT}\\scripts\\run-hook.cmd\" hook-stop.mjs\"",
+            "timeout": 8
+          }
+        ]
+      }
+    ]
+  }
+}
