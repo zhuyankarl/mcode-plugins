@@ -28,6 +28,18 @@ Write-Host "仓库目录 : $repoRoot"
 Write-Host "安装目标 : $dstRoot"
 Write-Host ''
 
+# 清理历史遗留: 早期版本的脚本把备份目录留在 plugins/ 里(如 groundtruth.bak-20261118-012812),
+# 插件扫描器会遍历该目录下的每个子目录, 这些残留会被当成重复插件(清单 name 与目录名不一致)。
+# 统一挪到 <dataDir>/plugin-backups/ 下。
+New-Item -ItemType Directory -Force -Path $dstRoot | Out-Null
+$bakRoot = Join-Path $DataDir 'plugin-backups'
+Get-ChildItem -LiteralPath $dstRoot -Directory -Force -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like '*.bak-*' } | ForEach-Object {
+        New-Item -ItemType Directory -Force -Path $bakRoot | Out-Null
+        Move-Item -LiteralPath $_.FullName -Destination (Join-Path $bakRoot $_.Name) -Force
+        Write-Host "清理旧备份 : $($_.Name) -> plugin-backups\$($_.Name)"
+    }
+
 $names = @('groundtruth', 'evidence-guard', 'submission-workbench')
 $installed = @()
 

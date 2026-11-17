@@ -29,6 +29,17 @@ echo "仓库目录 : $REPO_ROOT"
 echo "安装目标 : $DST_ROOT"
 echo
 
+# 清理历史遗留: 早期版本的脚本把备份目录留在 plugins/ 里(如 groundtruth.bak-20261118-012812),
+# 插件扫描器会遍历该目录下的每个子目录, 这些残留会被当成重复插件(清单 name 与目录名不一致)。
+# 统一挪到 <dataDir>/plugin-backups/ 下。
+mkdir -p "$DST_ROOT"
+for stale in "$DST_ROOT"/*.bak-*; do
+  [ -d "$stale" ] || continue
+  mkdir -p "$BAK_ROOT"
+  echo "清理旧备份 : $(basename "$stale") -> plugin-backups/$(basename "$stale")"
+  mv "$stale" "$BAK_ROOT/$(basename "$stale")"
+done
+
 install_one() {
   local name="$1"
   local src="$SRC_ROOT/$name"
