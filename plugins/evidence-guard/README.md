@@ -89,6 +89,23 @@ node --test "<plugin-dir>/tests/probe-table.test.mjs"
 - **没有联网能力。** 不发请求、不上报、不写用户目录，只读你明确指名的文件。
 - **没有依赖安装。** `package.json`、安装期脚本、`node_modules` 都不存在。
 
+## 提交说明（重新上架记录）
+
+本包曾于 2026-11-16 首次投稿（`submission_id` = `PLUGIN-202611160276`），**审核未通过并发布失败**，
+原因两条，均已在本版修复：
+
+1. **CSV 只取每行第一列。** 旧版 `probe-table.mjs` 读 CSV 时只取 `cells[0]`，其余列被丢弃，
+   于是 `cell` / `search` 对真实存在的值一律报「查无此值」，与当时 README 宣称支持 `.csv` 不符。
+   现按 RFC 4180 解析全部列，每个非空字段都带真实 A1 坐标（值在第几列就取第几列）。
+2. **data descriptor 归档解析失败。** 旧版 `lib/xlsx.mjs` 用 zip **本地文件头**的尺寸解压；
+   而用通用标志位 0x08 流式写出的归档，该处存的是 0，每个条目都被读成空，整个工作簿打不开。
+   现以**中央目录**的尺寸为权威，并补上 zip64 与 data descriptor 回退路径。
+
+修复后新增 `tests/probe-table.test.mjs`（11 条回归测试）：多列 CSV、引号字段、嵌入换行、UTF-8 BOM、
+data descriptor 归档、常规归档、`.xls` 报错路径，全部覆盖上述两个缺陷。
+
+源码与提交历史：<https://github.com/zhuyankarl/mcode-plugins> ，本包对应 `plugins/evidence-guard/`。
+
 ## 许可
 
 MIT，见 [LICENSE](LICENSE)。

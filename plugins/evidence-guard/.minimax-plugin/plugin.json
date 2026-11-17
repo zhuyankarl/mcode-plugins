@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "evidence-guard",
   "displayName": "Evidence Guard 证据守门",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "给高幻觉倾向模型装上可核查的取证纪律：每条结论标注已验证或未验证并附来源坐标，数值必须回源到真实表格的单元格，读不到就明说查无此值并给出核实路径。",
   "author": "明殊",
   "icon": "icon.png",

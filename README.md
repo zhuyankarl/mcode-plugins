@@ -155,7 +155,7 @@ node plugins/submission-workbench/tests/selftest.mjs
 
 | 插件 | 版本 | 说明 |
 | --- | --- | --- |
-| evidence-guard | 1.2.0 | 官方市场版首次成包。修复两处审核驳回缺陷：CSV 改为按 RFC 4180 解析**全部列**（旧版只取每行第一列，`cell`/`search` 对真实存在的值报「查无此值」）；zip 读取以**中央目录**尺寸为权威（data descriptor 标志位 0x08 的流式归档，旧版会把每个条目读成空）。新增 `lib/csv.mjs` 与回归测试 |
+| evidence-guard | 1.3.0 | 官方市场版。修复两处审核驳回缺陷：CSV 改为按 RFC 4180 解析**全部列**（旧版只取每行第一列，`cell`/`search` 对真实存在的值报「查无此值」）；zip 读取以**中央目录**尺寸为权威（data descriptor 标志位 0x08 的流式归档，旧版会把每个条目读成空）。新增 `lib/csv.mjs` 与 11 条回归测试；README 补「提交说明」记录驳回与修复经过 |
 | groundtruth | 1.1.1 | 取数脚本同步修复 CSV 多列读取与 data descriptor 归档解析；示例路径改为通用路径 |
 | groundtruth | 1.1.0 | Windows Hook 改为自解析 node 的启动器，移除硬编码绝对路径，可跨机分发；stdin JSON 增加 BOM 容错，避免带 BOM 的管道让校验链静默失效 |
 | submission-workbench | 1.1.0 | 测试脚本移出运行载荷（`tests/`），去掉未授权的宿主工具探测，README 拆成英文主文档 + 中文版 |
