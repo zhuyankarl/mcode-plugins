@@ -290,6 +290,31 @@ export function validateDraft(draft, assets) {
     }
   }
 
+  // ---- target category (guide §3) ----
+  // The category is a listing-form field in its own right: it must be reported
+  // even when the manifest is empty or invalid, so it lives outside the
+  // manifest-consistency block below.
+  if (!draft.category.trim()) {
+    issues.push({
+      id: 'listing.category.missing',
+      severity: 'error',
+      title: '未选择目标分类',
+      detail: `需要从固定分类中选择：${CATEGORIES.join('、')}`,
+      source: '指南 §3 编写 Plugin Manifest',
+      field: 'category',
+      missing: true,
+    });
+  } else if (!CATEGORIES.includes(draft.category)) {
+    issues.push({
+      id: 'listing.category.invalid',
+      severity: 'error',
+      title: '目标分类不在固定分类中',
+      detail: `当前值：${draft.category}`,
+      source: '指南 §3 编写 Plugin Manifest',
+      field: 'category',
+    });
+  }
+
   // ---- consistency between listing copy and manifest (guide §3, §9) ----
   if (manifest) {
     const manifestDisplayName =
@@ -355,26 +380,6 @@ export function validateDraft(draft, assets) {
         severity: 'warning',
         title: '目标分类与清单 category 不一致',
         detail: `目标分类「${draft.category}」，清单 category「${String(manifest.category)}」。`,
-        source: '指南 §3 编写 Plugin Manifest',
-        field: 'category',
-      });
-    }
-    if (!draft.category.trim()) {
-      issues.push({
-        id: 'listing.category.missing',
-        severity: 'error',
-        title: '未选择目标分类',
-        detail: `需要从固定分类中选择：${CATEGORIES.join('、')}`,
-        source: '指南 §3 编写 Plugin Manifest',
-        field: 'category',
-        missing: true,
-      });
-    } else if (!CATEGORIES.includes(draft.category)) {
-      issues.push({
-        id: 'listing.category.invalid',
-        severity: 'error',
-        title: '目标分类不在固定分类中',
-        detail: `当前值：${draft.category}`,
         source: '指南 §3 编写 Plugin Manifest',
         field: 'category',
       });

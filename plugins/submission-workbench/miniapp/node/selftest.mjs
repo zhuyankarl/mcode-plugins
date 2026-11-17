@@ -71,6 +71,32 @@ const VALID_MANIFEST = JSON.stringify(
 }
 
 {
+  // A UTF-8 BOM survives in the raw text but `String.prototype.trim()` strips it,
+  // so the BOM rule must inspect the raw input.
+  const result = validateManifest(`﻿${VALID_MANIFEST}`);
+  check(
+    'UTF-8 BOM detected',
+    result.issues.some((i) => i.id === 'manifest.bom'),
+    JSON.stringify(result.issues.map((i) => i.id)),
+  );
+  check('BOM manifest is not accepted', result.ok === false);
+}
+
+{
+  // One path can break several rules; every issue must keep a unique id.
+  const result = validateManifest(
+    JSON.stringify({
+      schemaVersion: 1,
+      name: 'ok-name',
+      version: '1.0.0',
+      skills: ['skills/中文 目录/SKILL.md'],
+    }),
+  );
+  const ids = result.issues.map((i) => i.id);
+  check('issue ids stay unique', new Set(ids).size === ids.length, JSON.stringify(ids));
+}
+
+{
   const result = validateManifest('{ "schemaVersion": 1, "name": "Bad_Name" }');
   check(
     'invalid name pattern detected',
@@ -122,7 +148,7 @@ const VALID_MANIFEST = JSON.stringify(
   );
   check(
     'path traversal detected',
-    result.issues.some((i) => i.id === 'manifest.skills.0.path'),
+    result.issues.some((i) => i.id.startsWith('manifest.skills.0.path.')),
   );
 }
 
@@ -215,10 +241,17 @@ const assets = [
 }
 
 {
-  const result = validateDraft({ ...baseDraft, manifestText: '' }, assets);
+  const result = validateDraft({ ...baseDraft, manifestText: '', category: '' }, assets);
   check(
     'missing manifest is flagged as missing',
     result.issues.some((i) => i.missing && i.field === 'manifest'),
+  );
+  // The category is a listing-form field: it must be reported even when the
+  // manifest is missing, otherwise the user never learns the form is incomplete.
+  check(
+    'missing category is flagged even without a manifest',
+    result.issues.some((i) => i.id === 'listing.category.missing' && i.missing),
+    JSON.stringify(result.issues.map((i) => i.id)),
   );
 }
 

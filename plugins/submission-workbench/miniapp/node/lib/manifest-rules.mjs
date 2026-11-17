@@ -118,7 +118,21 @@ function checkCapabilityPath(path, label) {
 export function validateManifest(manifestText) {
   /** @type {Issue[]} */
   const issues = [];
-  const trimmed = (manifestText ?? '').trim();
+  const raw = manifestText ?? '';
+  const trimmed = raw.trim();
+
+  // `String.prototype.trim()` strips U+FEFF, so the BOM must be checked on the
+  // raw text before trimming — otherwise a BOM-prefixed manifest looks clean.
+  if (raw.charCodeAt(0) === 0xfeff) {
+    issues.push({
+      id: 'manifest.bom',
+      severity: 'error',
+      title: '清单包含 UTF-8 BOM',
+      detail: '文本文件必须使用 UTF-8 且不带 BOM。',
+      source: '指南 §2 标准目录结构',
+      field: 'manifest',
+    });
+  }
 
   if (trimmed === '') {
     issues.push({
@@ -131,17 +145,6 @@ export function validateManifest(manifestText) {
       missing: true,
     });
     return { issues, manifest: null, ok: false };
-  }
-
-  if (trimmed.charCodeAt(0) === 0xfeff) {
-    issues.push({
-      id: 'manifest.bom',
-      severity: 'error',
-      title: '清单包含 UTF-8 BOM',
-      detail: '文本文件必须使用 UTF-8 且不带 BOM。',
-      source: '指南 §2 标准目录结构',
-      field: 'manifest',
-    });
   }
 
   const parsed = parseJsonWithDuplicates(trimmed);
@@ -369,16 +372,16 @@ export function validateManifest(manifestText) {
         field: 'icon',
       });
     }
-    for (const problem of checkCapabilityPath(icon, 'icon')) {
+    checkCapabilityPath(icon, 'icon').forEach((problem, problemIndex) => {
       issues.push({
-        id: 'manifest.icon.path',
+        id: `manifest.icon.path.${problemIndex}`,
         severity: 'error',
         title: 'icon 路径不合规',
         detail: problem,
         source: '指南 §2 标准目录结构',
         field: 'icon',
       });
-    }
+    });
   }
 
   // category
@@ -477,16 +480,19 @@ export function validateManifest(manifestText) {
     }
     capabilityCount += value.length;
     value.forEach((entry, index) => {
-      for (const problem of checkCapabilityPath(String(entry), `${field}[${index}]`)) {
+      const problems = checkCapabilityPath(String(entry), `${field}[${index}]`);
+      problems.forEach((problem, problemIndex) => {
         issues.push({
-          id: `manifest.${field}.${index}.path`,
+          // A single path can break several rules at once, so the problem index
+          // keeps every issue id unique.
+          id: `manifest.${field}.${index}.path.${problemIndex}`,
           severity: 'error',
           title: `${field} 路径不合规`,
           detail: problem,
           source: '指南 §2 标准目录结构',
           field,
         });
-      }
+      });
     });
   }
   if (capabilityCount === 0) {
