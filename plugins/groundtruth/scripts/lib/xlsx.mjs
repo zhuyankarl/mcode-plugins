@@ -7,53 +7,176 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 
 const EOCD_SIG = 0x06054b50;
+const EOCD64_LOC_SIG = 0x07064b50;
+const EOCD64_SIG = 0x06064b50;
 const CEN_SIG = 0x02014b50;
+const DD_SIG = 0x08074b50;
+const U32_MAX = 0xffffffff;
 
-/** Read every entry of a zip archive into a Map<name, Buffer>. */
-export function unzip(file) {
-  const buf = fs.readFileSync(file);
-  let eocd = -1;
+/** Locate the end-of-central-directory record. */
+function findEocd(buf) {
+  if (buf.length < 22) return -1;
   const min = Math.max(0, buf.length - 22 - 65536);
   for (let i = buf.length - 22; i >= min; i--) {
-    if (buf.readUInt32LE(i) === EOCD_SIG) {
-      eocd = i;
-      break;
+    if (buf.readUInt32LE(i) === EOCD_SIG) return i;
+  }
+  return -1;
+}
+
+/**
+ * Read the zip64 end-of-central-directory record, which holds the real entry
+ * count and directory offset when the 32-bit fields are saturated.
+ */
+function readZip64Directory(buf, eocd) {
+  const locOff = eocd - 20;
+  if (locOff < 0 || buf.readUInt32LE(locOff) !== EOCD64_LOC_SIG) return null;
+  const recOff = Number(buf.readBigUInt64LE(locOff + 8));
+  if (!Number.isSafeInteger(recOff) || recOff < 0 || recOff + 56 > buf.length) return null;
+  if (buf.readUInt32LE(recOff) !== EOCD64_SIG) return null;
+  return {
+    count: Number(buf.readBigUInt64LE(recOff + 32)),
+    offset: Number(buf.readBigUInt64LE(recOff + 48)),
+  };
+}
+
+/**
+ * Pull the zip64 extended information extra field (header id 0x0001) apart.
+ * Its 8-byte members appear in the order: uncompressed size, compressed
+ * size, local header offset — but only for the members that were saturated.
+ */
+function parseZip64Extra(extra) {
+  let pos = 0;
+  while (pos + 4 <= extra.length) {
+    const id = extra.readUInt16LE(pos);
+    const size = extra.readUInt16LE(pos + 2);
+    const body = extra.subarray(pos + 4, pos + 4 + size);
+    pos += 4 + size;
+    if (id !== 0x0001) continue;
+    const values = [];
+    let at = 0;
+    while (at + 8 <= body.length) {
+      values.push(Number(body.readBigUInt64LE(at)));
+      at += 8;
+    }
+    return values;
+  }
+  return [];
+}
+
+/**
+ * Recover the payload length of a streamed entry.
+ *
+ * When the general purpose flag 0x08 is set, the writer did not know the
+ * sizes upfront: the local header stores zeros and the real sizes sit in a
+ * data descriptor that follows the payload. The central directory normally
+ * still carries the true sizes, so this is only a fallback — but some
+ * writers leave the central directory size at zero as well.
+ */
+function streamedPayloadSize(buf, dataStart, dir, localOff, method) {
+  let bound = buf.length;
+  for (const entry of dir) {
+    if (entry.localOff > localOff && entry.localOff < bound) bound = entry.localOff;
+  }
+  // With the optional signature the descriptor starts with 0x08074b50, so the
+  // payload ends right where the descriptor starts.
+  for (let i = dataStart; i + 16 <= bound; i++) {
+    if (buf.readUInt32LE(i) === DD_SIG) return i - dataStart;
+  }
+  // No signature: the descriptor is 12 bytes (crc, compressed, uncompressed),
+  // so try both widths and keep the one that actually decompresses.
+  const candidates = [bound - dataStart - 12, bound - dataStart - 16];
+  for (const size of candidates) {
+    if (size <= 0 || dataStart + size > buf.length) continue;
+    if (method !== 8) continue;
+    try {
+      zlib.inflateRawSync(buf.subarray(dataStart, dataStart + size));
+      return size;
+    } catch {
+      // wrong width, try the next one
     }
   }
+  return 0;
+}
+
+/**
+ * Read every entry of a zip archive into a Map<name, Buffer>.
+ *
+ * The central directory is authoritative for every size. The local header is
+ * only used to find where the payload starts.
+ */
+export function unzip(file) {
+  const buf = fs.readFileSync(file);
+  const eocd = findEocd(buf);
   if (eocd < 0) throw new Error('not a zip container');
 
-  const count = buf.readUInt16LE(eocd + 10);
-  let off = buf.readUInt32LE(eocd + 16);
-  const entries = new Map();
+  let count = buf.readUInt16LE(eocd + 10);
+  let dirOffset = buf.readUInt32LE(eocd + 16);
+  if (count === 0xffff || dirOffset === U32_MAX) {
+    const z64 = readZip64Directory(buf, eocd);
+    if (z64) {
+      count = z64.count;
+      dirOffset = z64.offset;
+    }
+  }
+  if (!Number.isSafeInteger(dirOffset) || dirOffset < 0 || dirOffset >= buf.length) {
+    throw new Error('corrupt zip: central directory offset out of range');
+  }
 
+  // Pass 1 — read the central directory.
+  const dir = [];
+  let off = dirOffset;
   for (let i = 0; i < count; i++) {
     if (off + 46 > buf.length || buf.readUInt32LE(off) !== CEN_SIG) break;
     const flags = buf.readUInt16LE(off + 8);
     const method = buf.readUInt16LE(off + 10);
-    const compSize = buf.readUInt32LE(off + 20);
+    let compSize = buf.readUInt32LE(off + 20);
+    let uncompSize = buf.readUInt32LE(off + 24);
     const nameLen = buf.readUInt16LE(off + 28);
     const extraLen = buf.readUInt16LE(off + 30);
     const commentLen = buf.readUInt16LE(off + 32);
-    const localOff = buf.readUInt32LE(off + 42);
+    let localOff = buf.readUInt32LE(off + 42);
     const name = buf.toString('utf8', off + 46, off + 46 + nameLen);
+    const extra = buf.subarray(off + 46 + nameLen, off + 46 + nameLen + extraLen);
 
+    const z64 = parseZip64Extra(extra);
+    let k = 0;
+    if (uncompSize === U32_MAX && k < z64.length) uncompSize = z64[k++];
+    if (compSize === U32_MAX && k < z64.length) compSize = z64[k++];
+    if (localOff === U32_MAX && k < z64.length) localOff = z64[k++];
+
+    dir.push({ name, flags, method, compSize, localOff });
+    off += 46 + nameLen + extraLen + commentLen;
+  }
+
+  // Pass 2 — extract each payload.
+  const entries = new Map();
+  for (const entry of dir) {
+    const localOff = entry.localOff;
+    if (localOff + 30 > buf.length) {
+      throw new Error(`corrupt zip: bad local header for ${entry.name}`);
+    }
     const lhNameLen = buf.readUInt16LE(localOff + 26);
     const lhExtraLen = buf.readUInt16LE(localOff + 28);
     const dataStart = localOff + 30 + lhNameLen + lhExtraLen;
 
-    let size = compSize;
-    if (flags & 0x08) {
-      // Sizes live in the local header when a data descriptor is used.
-      size = buf.readUInt32LE(localOff + 18);
+    let size = entry.compSize;
+    if (size === 0 && (entry.flags & 0x08)) {
+      size = streamedPayloadSize(buf, dataStart, dir, localOff, entry.method);
     }
     const comp = buf.subarray(dataStart, dataStart + size);
     let data;
-    if (method === 0) data = Buffer.from(comp);
-    else if (method === 8) data = zlib.inflateRawSync(comp);
-    else throw new Error(`unsupported zip compression method ${method}`);
-
-    entries.set(name, data);
-    off += 46 + nameLen + extraLen + commentLen;
+    if (entry.method === 0) {
+      data = Buffer.from(comp);
+    } else if (entry.method === 8) {
+      try {
+        data = zlib.inflateRawSync(comp);
+      } catch (err) {
+        throw new Error(`cannot inflate ${entry.name}: ${err.message}`);
+      }
+    } else {
+      throw new Error(`unsupported zip compression method ${entry.method}`);
+    }
+    entries.set(entry.name, data);
   }
   return entries;
 }

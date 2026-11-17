@@ -5,14 +5,16 @@
 // Usage:
 //   node probe-table.mjs find <keyword> [--root <dir>] [--limit <n>]
 //   node probe-table.mjs sheets <file>
-//   node probe-table.mjs dump <file> [--sheet <name>] [--max-rows <n>] [--grep <kw>]
+//   node probe-table.mjs dump <file> [--sheet <name>] [--max-rows <n>] [--grep <kw>] [--delimiter <c>]
 //   node probe-table.mjs cell <file> <sheet> <ref>
+//   node probe-table.mjs cell <file.csv> <ref>            (single-sheet CSV)
 //   node probe-table.mjs search <file> <keyword> [--sheet <name>] [--limit <n>]
 //
-// Every printed value carries its coordinate, e.g.  A_安全红线.xlsx!Sheet1!C7 = 1200
+// Every printed value carries its coordinate, e.g.  A_产量明细.xlsx!Sheet1!C7 = 1200
 import fs from 'node:fs';
 import path from 'node:path';
 import { readWorkbook, renderSheet, colToLetters } from './lib/xlsx.mjs';
+import { readCsvSheet } from './lib/csv.mjs';
 
 function parseArgs(argv) {
   const positional = [];
@@ -65,24 +67,29 @@ function listTables(root, keyword, limit) {
   return out;
 }
 
-function load(file) {
+/**
+ * Resolve a requested sheet name against the sheets a file actually has.
+ * The exact name wins; a case difference or a `.csv` suffix is tolerated so
+ * `cell data.csv data B2` and `cell data.csv data.csv B2` both work.
+ */
+function pickSheet(book, wanted) {
+  if (wanted === undefined || wanted === null || wanted === '') return null;
+  const target = String(wanted).trim();
+  const lower = target.toLowerCase();
+  return (
+    book.sheets.find((s) => s.name === target) ||
+    book.sheets.find((s) => s.name.toLowerCase() === lower) ||
+    book.sheets.find((s) => s.name.toLowerCase().replace(/\.csv$/, '') === lower.replace(/\.csv$/, '')) ||
+    null
+  );
+}
+
+function load(file, delimiter) {
   if (/\.xls$/i.test(file)) {
     throw new Error('legacy .xls (BIFF) is not supported by this probe; convert to .xlsx or use the xlsx skill');
   }
   if (/\.csv$/i.test(file)) {
-    const text = fs.readFileSync(file, 'utf8');
-    const lines = text.split(/\r?\n/);
-    const rows = lines.map((line, i) => {
-      const cells = line.split(',');
-      return {
-        ref: `A${i + 1}`,
-        col: 0,
-        row: i + 1,
-        value: cells[0] || '',
-        raw: line,
-      };
-    });
-    return { sheets: [{ name: path.basename(file), cells: rows, rows: new Map([[1, rows]]) }] };
+    return readCsvSheet(file, { delimiter });
   }
   return readWorkbook(file);
 }
@@ -120,7 +127,7 @@ function main() {
     process.exit(2);
   }
 
-  const book = load(file);
+  const book = load(file, flags.delimiter ? String(flags.delimiter) : undefined);
   const base = path.basename(file);
 
   if (cmd === 'sheets') {
@@ -133,10 +140,16 @@ function main() {
     const wanted = flags.sheet ? String(flags.sheet) : null;
     const maxRows = Number(flags.maxrows || flags['max-rows'] || 200);
     const grep = flags.grep ? String(flags.grep) : null;
-    const sheets = wanted ? book.sheets.filter((s) => s.name === wanted) : book.sheets;
-    if (!sheets.length) {
-      process.stderr.write(`probe-table.mjs: sheet "${wanted}" not found in ${base}\n`);
-      process.exit(2);
+    let sheets = book.sheets;
+    if (wanted) {
+      const picked = pickSheet(book, wanted);
+      if (!picked) {
+        process.stderr.write(
+          `probe-table.mjs: sheet "${wanted}" not found in ${base} (available: ${book.sheets.map((s) => s.name).join(', ')})\n`
+        );
+        process.exit(2);
+      }
+      sheets = [picked];
     }
     process.stdout.write(`# ${base}\n`);
     for (const s of sheets) {
@@ -149,16 +162,35 @@ function main() {
   }
 
   if (cmd === 'cell') {
-    const sheetName = positional[2];
-    const ref = String(positional[3] || '').toUpperCase();
-    const sheet = book.sheets.find((s) => s.name === sheetName);
-    if (!sheet) {
-      process.stderr.write(`probe-table.mjs: sheet "${sheetName}" not found in ${base}\n`);
+    // `cell <file> <sheet> <ref>` for multi-sheet workbooks,
+    // `cell <file> <ref>` for a file with a single sheet (any .csv).
+    const hasSheetArg = positional.length >= 4;
+    const sheetName = hasSheetArg ? positional[2] : null;
+    const ref = String((hasSheetArg ? positional[3] : positional[2]) || '').toUpperCase();
+    if (!ref) {
+      process.stderr.write('probe-table.mjs: missing cell reference\n');
+      process.exit(2);
+    }
+    let sheet = null;
+    if (sheetName) {
+      sheet = pickSheet(book, sheetName);
+      if (!sheet) {
+        process.stderr.write(
+          `probe-table.mjs: sheet "${sheetName}" not found in ${base} (available: ${book.sheets.map((s) => s.name).join(', ')})\n`
+        );
+        process.exit(2);
+      }
+    } else if (book.sheets.length === 1) {
+      sheet = book.sheets[0];
+    } else {
+      process.stderr.write(
+        `probe-table.mjs: ${base} has ${book.sheets.length} sheets, name one of: ${book.sheets.map((s) => s.name).join(', ')}\n`
+      );
       process.exit(2);
     }
     const cell = sheet.cells.find((c) => c.ref === ref);
     if (!cell) {
-      process.stderr.write(`probe-table.mjs: cell ${sheetName}!${ref} is empty or missing in ${base}\n`);
+      process.stderr.write(`probe-table.mjs: cell ${sheet.name}!${ref} is empty or missing in ${base}\n`);
       process.exit(2);
     }
     process.stdout.write(`${base}!${sheet.name}!${cell.ref} = ${cell.value}\n`);
@@ -169,7 +201,17 @@ function main() {
     const keyword = String(positional[2] || '').toLowerCase();
     const limit = Number(flags.limit || 60);
     const wanted = flags.sheet ? String(flags.sheet) : null;
-    const sheets = wanted ? book.sheets.filter((s) => s.name === wanted) : book.sheets;
+    let sheets = book.sheets;
+    if (wanted) {
+      const picked = pickSheet(book, wanted);
+      if (!picked) {
+        process.stderr.write(
+          `probe-table.mjs: sheet "${wanted}" not found in ${base} (available: ${book.sheets.map((s) => s.name).join(', ')})\n`
+        );
+        process.exit(2);
+      }
+      sheets = [picked];
+    }
     let hits = 0;
     for (const s of sheets) {
       for (const c of s.cells) {

@@ -23,19 +23,19 @@ The Plugin ships a dependency-free reader:
 
 ```bash
 # 1. find the real table (never guess the name)
-node "${PLUGIN_ROOT}/scripts/probe-table.mjs" find 安全红线 --root J:/AOEM-X
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" find 产量明细 --root "D:/project/data"
 
 # 2. list sheets
-node "${PLUGIN_ROOT}/scripts/probe-table.mjs" sheets "J:/AOEM-X/common/excel/xls/Main/A_安全红线.xlsx"
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" sheets "D:/project/data/report/A_产量明细.xlsx"
 
 # 3. dump rows with coordinates
-node "${PLUGIN_ROOT}/scripts/probe-table.mjs" dump "J:/AOEM-X/.../A_安全红线.xlsx" --sheet Sheet1 --max-rows 60
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" dump "D:/project/data/report/A_产量明细.xlsx" --sheet Sheet1 --max-rows 60
 
 # 4. read one exact cell
-node "${PLUGIN_ROOT}/scripts/probe-table.mjs" cell "J:/AOEM-X/.../A_安全红线.xlsx" Sheet1 C7
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" cell "D:/project/data/report/A_产量明细.xlsx" Sheet1 C7
 
 # 5. find a keyword inside cells
-node "${PLUGIN_ROOT}/scripts/probe-table.mjs" search "J:/AOEM-X/.../A_安全红线.xlsx" 钻石
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" search "D:/project/data/report/A_产量明细.xlsx" 总计
 ```
 
 If `probe-table.mjs` is not on PATH, read the `.xlsx` with the `xlsx` Skill instead —
@@ -72,7 +72,7 @@ but keep the coordinate discipline either way.
 【已验证】二级文明 3 级解锁消耗 = 500
   证据：A_文明等级.xlsx!Sheet1!C12 = 500（行标题「3级」，列标题「解锁消耗」）
 
-【未验证】全表钻石产出合计
+【未验证】全表数量合计
   缺证：另 6 张产出表未逐一回源；核实路径：对 common/excel/xls/Main 下 7 张含「产出」的表执行 cell 取值后求和
 ```
 

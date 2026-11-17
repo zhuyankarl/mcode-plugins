@@ -1,0 +1,95 @@
+---
+name: number-grounding
+description: Trace every number back to the actual spreadsheet cell, code line, or command output it came from. Use whenever a task involves 数值/统计/表格/配置取值/配平校验, reading Excel or CSV data, or when a number appears in a report, plan, or comparison.
+---
+
+# Number Grounding
+
+A number without a coordinate is a guess with a decimal point. Every figure that
+reaches the user must be traceable to one exact location.
+
+## The four steps
+
+1. **Locate the real file.** Never trust a remembered table name. Search the
+   filesystem and use the name that actually exists.
+2. **Read the real content.** Read the file, do not recall what such a table usually
+   contains.
+3. **Extract the value with its coordinate.** Keep the sheet, row and column.
+4. **Cite it.** `表名!Sheet!单元格 = 值`, alongside the raw value in the reply.
+
+## Tooling
+
+The Plugin ships a dependency-free reader at `scripts/probe-table.mjs`, inside
+the plugin directory. Resolve that directory to an absolute path first — the
+plugin manager shows it — then call it with `node`:
+
+```bash
+# 1. find the real table (never guess the name)
+node "<plugin-dir>/scripts/probe-table.mjs" find 产量明细 --root D:/project/data
+
+# 2. list sheets
+node "<plugin-dir>/scripts/probe-table.mjs" sheets "D:/project/data/report/A_产量明细.xlsx"
+
+# 3. dump rows with coordinates
+node "<plugin-dir>/scripts/probe-table.mjs" dump "D:/project/data/report/A_产量明细.xlsx" --sheet Sheet1 --max-rows 60
+
+# 4. read one exact cell
+node "<plugin-dir>/scripts/probe-table.mjs" cell "D:/project/data/report/A_产量明细.xlsx" Sheet1 C7
+
+# 5. find a keyword inside cells
+node "<plugin-dir>/scripts/probe-table.mjs" search "D:/project/data/report/A_产量明细.xlsx" 产品甲
+```
+
+Every line of output carries its coordinate (`表名!Sheet!单元格 = 值`), so it can
+be quoted directly in the reply.
+
+For a `.csv` the file has a single sheet named after the file, so the sheet
+argument may be omitted:
+
+```bash
+node "<plugin-dir>/scripts/probe-table.mjs" cell "D:/project/data/report/产出表.csv" C7
+node "<plugin-dir>/scripts/probe-table.mjs" search "D:/project/data/report/产出表.csv" 产品甲
+```
+
+If the reader cannot run (no Node.js in the environment), read the `.xlsx` with
+the `xlsx` Skill instead — but keep the coordinate discipline either way.
+
+## Hard rules
+
+- A number you did not read in this session is 未验证, even if you are certain.
+- Never average, interpolate or round a source number without saying so.
+- Never carry a number over from a similar-sounding table, an older version, or a
+  previous task. Re-read it.
+- If a table cannot be found or read, say "无法验证" and give the path that would
+  settle it. Do not substitute an estimate.
+- When a total is computed, show the formula and the cells it sums. A stated total
+  with no derivation is unverifiable.
+
+## Traps in real spreadsheets
+
+- `~$xxx.xlsx` files are Excel lock files, not data. Skip them.
+- A cell may hold a formula whose cached value is stale. If a value looks wrong
+  against its neighbours, check whether it is a formula and say which.
+- Dates are often serial numbers; check the cell format before quoting a date.
+- The same column label can exist in several sheets with different meanings. Always
+  name the sheet.
+- The header may not be on row 1; confirm what a row means before counting rows.
+- The table may be in the project's `common/excel/xls/` folder while the file
+  extension is `.xlsx` — judge by content, not by folder name.
+- Legacy `.xls` (BIFF) is not readable by the bundled probe. Convert it, or use the
+  `xlsx` Skill, and say which path you took.
+- A `.csv` is a real table, not a single column of text: read the cell you need by
+  its A1 coordinate, not by hoping the value appears in the first field.
+
+## Reporting format
+
+```
+【已验证】二级文明 3 级解锁消耗 = 500
+  证据：A_文明等级.xlsx!Sheet1!C12 = 500（行标题「3级」，列标题「解锁消耗」）
+
+【未验证】全表数量合计
+  缺证：另 6 张产出表未逐一回源；核实路径：对 common/excel/xls/Main 下 7 张含「产出」的表执行 cell 取值后求和
+```
+
+Never merge the two states into one paragraph. The reader must be able to see which
+numbers were checked and which were not.

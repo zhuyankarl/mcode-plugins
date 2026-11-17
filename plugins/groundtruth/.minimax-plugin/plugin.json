@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "groundtruth",
   "displayName": "Groundtruth 证据守门",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "为高幻觉倾向模型加装证据契约：会话启动注入弃权与出处规程，收尾时对伪造路径、无证据完成声明做确定性校验，数值结论强制回源到实际表格并给出来源坐标。",
   "author": "明殊",
   "icon": "icon.png",

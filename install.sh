@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 在本机安装 mcode-plugins 仓库里的两个 MiniMax 插件（macOS / Linux）。
+# 在本机安装 mcode-plugins 仓库里的三个 MiniMax 插件（macOS / Linux）。
 #
 # 用法：
 #   bash install.sh
@@ -23,6 +23,7 @@ while [ $# -gt 0 ]; do
 done
 
 DST_ROOT="$DATA_DIR/plugins"
+BAK_ROOT="$DATA_DIR/plugin-backups"
 
 echo "仓库目录 : $REPO_ROOT"
 echo "安装目标 : $DST_ROOT"
@@ -41,7 +42,10 @@ install_one() {
   if [ -e "$dst" ]; then
     local stamp bak
     stamp="$(date +%Y%m%d-%H%M%S)"
-    bak="$dst.bak-$stamp"
+    # 备份放在 plugins/ 之外: 插件扫描器会遍历该目录下的每个子目录,
+    # 留在原地会被当成重复插件(清单 name 与目录名不一致), 也会污染插件列表。
+    bak="$BAK_ROOT/$name.bak-$stamp"
+    mkdir -p "$BAK_ROOT"
     echo "已存在，备份后覆盖 : $dst -> $bak"
     mv "$dst" "$bak"
   fi
@@ -54,6 +58,7 @@ install_one() {
 
 mkdir -p "$DST_ROOT"
 install_one groundtruth
+install_one evidence-guard
 install_one submission-workbench
 
 echo
@@ -65,7 +70,7 @@ else
   echo "[WARN] 没找到 node。groundtruth 的 Hook 需要 Node.js LTS，请先安装并确保在 PATH 中。" >&2
 fi
 
-for name in groundtruth submission-workbench; do
+for name in groundtruth evidence-guard submission-workbench; do
   pkg="$DST_ROOT/$name/.minimax-plugin/plugin.json"
   if [ -f "$pkg" ]; then
     icon=$(node -e "const m=require('$pkg');console.log(m.icon||'')" 2>/dev/null || echo "")

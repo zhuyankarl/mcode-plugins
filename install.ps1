@@ -1,10 +1,10 @@
 ﻿<#
 .SYNOPSIS
-  在本机安装 mcode-plugins 仓库里的两个 MiniMax 插件（Windows）。
+  在本机安装 mcode-plugins 仓库里的三个 MiniMax 插件（Windows）。
 
 .DESCRIPTION
-  把 plugins/groundtruth 与 plugins/submission-workbench 复制到 MiniMax Code 的
-  用户级插件目录（默认 %USERPROFILE%\.minimax\plugins），并做安装后自检。
+  把 plugins/groundtruth、plugins/evidence-guard 与 plugins/submission-workbench 复制到
+  MiniMax Code 的用户级插件目录（默认 %USERPROFILE%\.minimax\plugins），并做安装后自检。
   已存在的同名目录会先备份为 <name>.bak-<时间戳>，不覆盖你的修改。
 
 .EXAMPLE
@@ -28,7 +28,7 @@ Write-Host "仓库目录 : $repoRoot"
 Write-Host "安装目标 : $dstRoot"
 Write-Host ''
 
-$names = @('groundtruth', 'submission-workbench')
+$names = @('groundtruth', 'evidence-guard', 'submission-workbench')
 $installed = @()
 
 foreach ($name in $names) {
@@ -40,17 +40,14 @@ foreach ($name in $names) {
 
   $dst = Join-Path $dstRoot $name
   if (Test-Path -LiteralPath $dst) {
-    if ($Force) {
-      $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-      $bak  = "$dst.bak-$stamp"
-      Write-Host "备份    : $dst -> $bak"
-      Move-Item -LiteralPath $dst -Destination $bak -Force
-    } else {
-      $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-      $bak  = "$dst.bak-$stamp"
-      Write-Host "已存在，备份后覆盖 : $dst -> $bak"
-      Move-Item -LiteralPath $dst -Destination $bak -Force
-    }
+    # 备份必须落在 plugins/ 之外: 插件扫描器会遍历该目录下的每个子目录,
+    # 留在原地会被当成重复插件(清单 name 与目录名不一致), 也会污染插件列表。
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $bakRoot = Join-Path $DataDir 'plugin-backups'
+    New-Item -ItemType Directory -Force -Path $bakRoot | Out-Null
+    $bak  = Join-Path $bakRoot "$name.bak-$stamp"
+    Write-Host "已存在，备份后覆盖 : $dst -> $bak"
+    Move-Item -LiteralPath $dst -Destination $bak -Force
   }
 
   New-Item -ItemType Directory -Force -Path $dst | Out-Null

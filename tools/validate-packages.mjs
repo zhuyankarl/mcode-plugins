@@ -241,6 +241,43 @@ for (const file of scripts) {
 }
 ok(`Node 脚本语法检查通过：${syntaxOk}/${scripts.length}`);
 
+// --- 4. the marketplace build must not drift from the local build ----------
+//
+// `evidence-guard` is the marketplace variant of `groundtruth`: same two
+// Skills, same reader scripts, no Hooks. The reader scripts are duplicated
+// rather than shared (a Skill package has to be self-contained), so the two
+// copies can drift. That is exactly how the 2026-11-16 submission shipped a
+// CSV reader that only ever read the first column. Compare them byte for
+// byte so a fix applied to one side cannot be forgotten on the other.
+const SHARED_FILES = [
+  'scripts/probe-table.mjs',
+  'scripts/lib/xlsx.mjs',
+  'scripts/lib/csv.mjs',
+  'tests/probe-table.test.mjs',
+];
+const localPkg = path.join(pluginsRoot, 'groundtruth');
+const marketPkg = path.join(pluginsRoot, 'evidence-guard');
+if (fs.existsSync(localPkg) && fs.existsSync(marketPkg)) {
+  for (const rel of SHARED_FILES) {
+    const a = path.join(localPkg, rel);
+    const b = path.join(marketPkg, rel);
+    if (!fs.existsSync(a)) {
+      fail(`groundtruth/${rel}: 不存在，无法与 evidence-guard 比对`);
+      continue;
+    }
+    if (!fs.existsSync(b)) {
+      fail(`evidence-guard/${rel}: 缺失，市场版必须带上这份共享文件`);
+      continue;
+    }
+    const bufA = fs.readFileSync(a);
+    const bufB = fs.readFileSync(b);
+    if (!bufA.equals(bufB)) {
+      fail(`evidence-guard/${rel}: 与 groundtruth/${rel} 不一致，市场版会带上旧代码`);
+    }
+  }
+  ok(`evidence-guard 与 groundtruth 的 ${SHARED_FILES.length} 个共享文件逐字节一致`);
+}
+
 // --- report ---------------------------------------------------------------
 console.log(notes.map((n) => `  [OK]   ${n}`).join('\n'));
 if (problems.length) {

@@ -48,15 +48,35 @@ F1 约 0.815，换 LLM judge 会掉到 0.308，硬拦误伤太高。
 ## 取数脚本
 
 ```bash
-node "${PLUGIN_ROOT}/scripts/probe-table.mjs" find 安全红线 --root J:/AOEM-X
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" find 产量明细 --root "D:/project/data"
 node "${PLUGIN_ROOT}/scripts/probe-table.mjs" sheets "<表路径>.xlsx"
 node "${PLUGIN_ROOT}/scripts/probe-table.mjs" dump "<表路径>.xlsx" --sheet Sheet1 --max-rows 60
 node "${PLUGIN_ROOT}/scripts/probe-table.mjs" cell "<表路径>.xlsx" Sheet1 C7
-node "${PLUGIN_ROOT}/scripts/probe-table.mjs" search "<表路径>.xlsx" 钻石
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" search "<表路径>.xlsx" 总计
 ```
 
-输出自带坐标（`表名!Sheet!单元格 = 值`），可直接引用。支持 `.xlsx` / `.csv`；
-旧版 BIFF `.xls` 不支持，脚本会明确报错，此时改用 `xlsx` Skill。
+输出自带坐标（`表名!Sheet!单元格 = 值`），可直接引用。
+
+支持范围：
+
+| 格式 | 支持情况 |
+| --- | --- |
+| `.xlsx` | 支持，含 zip64 归档与 **data descriptor**（通用标志位 0x08）写出的流式归档 —— 以中央目录的尺寸为准，本地文件头在流式写入时是 0。 |
+| `.csv` | 支持，按 **RFC 4180** 解析：多列、引号内的逗号与换行、`""` 转义、UTF-8 BOM。值在第几列就取第几列，不再只读第一列。 |
+| `.xls`（BIFF8 旧格式） | 不支持，脚本明确报错，此时改用 `xlsx` Skill。 |
+
+CSV 是单表，sheet 名取文件名（去扩展名），所以 `cell` 命令可以省略 sheet 参数：
+
+```bash
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" cell "<表路径>.csv" C7
+node "${PLUGIN_ROOT}/scripts/probe-table.mjs" search "<表路径>.csv" 产品甲
+```
+
+回归测试（含多列 CSV、引号字段、BOM、data descriptor 归档、旧 `.xls` 报错路径）：
+
+```bash
+node --test plugins/groundtruth/tests/probe-table.test.mjs
+```
 
 ## 调参
 
@@ -79,12 +99,23 @@ node "${PLUGIN_ROOT}/scripts/probe-table.mjs" search "<表路径>.xlsx" 钻石
 
 本地这份是**完整版（含 Hook）**，插件名 `groundtruth`。
 上架到官方插件市场的**轻量版（纯 Skill，无 Hook）叫 `evidence-guard`**，
-两者名字不同，可以共存；从市场安装 `evidence-guard` 不会覆盖本地的 `groundtruth`。
+源目录在本仓库 `plugins/evidence-guard/`，两者名字不同，可以共存；
+从市场安装 `evidence-guard` 不会覆盖本地的 `groundtruth`。
 
-**上架状态**：`evidence-guard` 已于 2026-11-16 通过官方投稿表单提交，
-`submission_id` = `PLUGIN-202611160276`，提交区域 CN、启用端桌面端+云端；
+市场版与本地版共用 `scripts/probe-table.mjs`、`scripts/lib/xlsx.mjs`、
+`scripts/lib/csv.mjs` 与 `tests/probe-table.test.mjs` 四份文件，**必须逐字节一致**——
+`tools/validate-packages.mjs` 会强制校验，防止修了一边忘了另一边。
+
+**上架状态**：
+
+| 时间 | 事件 |
+| --- | --- |
+| 2026-11-16 | 首次投稿，`submission_id` = `PLUGIN-202611160276`，区域 CN，启用端桌面端+云端 |
+| 2026-11-17 | **发布失败**（审核未通过）：CSV 只取每行第一列，导致 `cell` / `search` 对真实存在的值报「查无此值」，与 README 宣称支持 `.csv` 不符；用 data descriptor（zip 标志位 0x08）写出的 xlsx 无法解析 |
+| 2026-11-18 | 两个缺陷已修复并加回归测试，市场版重建为 `evidence-guard` v1.2.0，重新提交 |
+
 查询进度需「原提交飞书账号 + submission_id + 提交邮箱 545965171@qq.com」三者匹配，
-结果由飞书「多维表格助手」机器人回执。台账见 `E:\minimaxworkspace\evidence-guard-submission.md`。
+结果由飞书「多维表格助手」机器人回执。
 
 ## 分发
 
