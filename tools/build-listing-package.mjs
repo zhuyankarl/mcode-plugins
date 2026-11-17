@@ -111,9 +111,15 @@ const draft = {
 };
 
 const { issues } = validateDraft(draft, assets);
-const errors = issues.filter((issue) => issue.severity === 'error');
-const warnings = issues.filter((issue) => issue.severity === 'warning');
-const infos = issues.filter((issue) => issue.severity === 'info');
+// The guide's §9 checklist mentions a screenshot, but the official form has no
+// screenshot field — it is optional market-card material, not a submission
+// blocker, so it is reported separately instead of counted as an error.
+const NON_BLOCKING = new Set(['listing.screenshot.missing']);
+const blocking = issues.filter((issue) => !NON_BLOCKING.has(issue.id));
+const errors = blocking.filter((issue) => issue.severity === 'error');
+const warnings = blocking.filter((issue) => issue.severity === 'warning');
+const infos = blocking.filter((issue) => issue.severity === 'info');
+const notes = issues.filter((issue) => NON_BLOCKING.has(issue.id));
 
 // --- 2. build the archive ---------------------------------------------------
 const entries = files.map((rel) => ({
@@ -144,11 +150,12 @@ lines.push('');
 lines.push(`- error：${errors.length}`);
 lines.push(`- warning：${warnings.length}`);
 lines.push(`- info：${infos.length}`);
+lines.push(`- 非阻塞提示：${notes.length}`);
 lines.push('');
-if (issues.length) {
+if (blocking.length) {
   lines.push('## 逐条结果');
   lines.push('');
-  for (const issue of issues) {
+  for (const issue of blocking) {
     lines.push(`- **[${issue.severity}]** ${issue.title}`);
     lines.push(`  - ${issue.detail}`);
     lines.push(`  - 依据：${issue.source}${issue.field ? `（${issue.field}）` : ''}`);
@@ -165,7 +172,10 @@ lines.push('## 提交时需要人工填写的项');
 lines.push('');
 lines.push(`- 提交飞书账号：${SUBMISSION_META.submitAccount || '**待填**（提交时必须用与上次一致的账号）'}`);
 lines.push(`- 组织 / 团队：${SUBMISSION_META.organization || '**待填**'}`);
-lines.push('- 至少一张截图：**待上传**（市场卡片用，不能用包内文件代替）');
+lines.push('');
+lines.push('> 指南 §9 的自查清单里列了「至少一张截图」，但**官方投稿表单没有截图字段**');
+lines.push('> （实测字段只有：Plugin 名、操作类型、来源类型、目标区域、启用端、维护权证明、组织/团队、联系邮箱）。');
+lines.push('> 截图是市场卡片素材，可选补交，不是提交阻塞项，故此处不计入 error。');
 lines.push('');
 lines.push('## 与上次被驳回版本的差异');
 lines.push('');
